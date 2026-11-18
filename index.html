@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0c10">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<title>JM</title>
+<style>
+  :root { --bg:#0c0c10; --card:#17171f; --line:#2a2a36; --txt:#f4f4f7; --mut:#9a9aab; --accent:#a855f7; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+         font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         padding:18px 16px calc(40px + env(safe-area-inset-bottom)); }
+  .wrap { max-width:480px; margin:0 auto; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .logo { font-weight:900; font-size:26px; letter-spacing:1px; padding:6px 14px; border-radius:12px;
+          background:var(--accent); color:#fff; transition:background .2s; }
+  header p { margin:0; color:var(--mut); font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px; }
+  .card h2 { margin:0 0 10px; font-size:15px; font-weight:600; }
+  .pick { display:flex; align-items:center; gap:10px; padding:14px; border:1.5px dashed var(--line);
+          border-radius:12px; cursor:pointer; color:var(--mut); font-size:15px; }
+  .pick.ok { border-style:solid; border-color:var(--accent); color:var(--txt); }
+  .pick span.name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .pick input { display:none; }
+  .bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:8px; display:none; }
+  .bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .2s; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { padding:10px 14px; border-radius:999px; border:1.5px solid var(--line); background:transparent;
+          color:var(--txt); font-size:14px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+  .chip.on { border-color:var(--accent); background:rgba(255,255,255,.06); }
+  .dot { width:14px; height:14px; border-radius:50%; border:1px solid rgba(255,255,255,.35); }
+  .custom { display:flex; align-items:center; gap:10px; margin-top:10px; color:var(--mut); font-size:14px; }
+  .custom input { width:44px; height:32px; border:none; background:none; padding:0; }
+  button.go { width:100%; padding:16px; border:none; border-radius:14px; background:var(--accent); color:#fff;
+              font-size:17px; font-weight:700; cursor:pointer; transition:background .2s; }
+  button.go:disabled { opacity:.45; cursor:default; }
+  .status { text-align:center; color:var(--mut); font-size:14px; margin-top:12px; min-height:20px; }
+  .err { color:#ff8a8a; }
+  #result { display:none; }
+  video { width:100%; max-height:70vh; border-radius:12px; background:#000; }
+  a.dl { display:block; text-align:center; margin-top:10px; padding:14px; border-radius:12px;
+         border:1.5px solid var(--accent); color:var(--txt); text-decoration:none; font-weight:600; }
+  .hint { color:var(--mut); font-size:12.5px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo" id="logo">JM</div>
+    <p>Edits no ritmo da música, em 9:16</p>
+  </header>
+
+  <div class="card">
+    <h2>1. Música</h2>
+    <label class="pick" id="pickMusic">
+      <span>🎵</span><span class="name">Escolher a música (remix)</span>
+      <input type="file" id="music" accept="audio/*,video/*">
+    </label>
+    <div class="bar" id="barMusic"><i></i></div>
+  </div>
+
+  <div class="card">
+    <h2>2. Vídeo</h2>
+    <label class="pick" id="pickVideo">
+      <span>🎬</span><span class="name">Escolher o vídeo (ex.: melhores lances)</span>
+      <input type="file" id="video" accept="video/*">
+    </label>
+    <div class="bar" id="barVideo"><i></i></div>
+  </div>
+
+  <div class="card">
+    <h2>3. Cor dos efeitos</h2>
+    <div class="row" id="colors"></div>
+    <div class="custom">Outra cor: <input type="color" id="custom" value="#ff3b30"></div>
+  </div>
+
+  <div class="card">
+    <h2>4. Estilo</h2>
+    <div class="hint" style="margin:0 0 6px">Tamanho do edit</div>
+    <div class="row" id="durations"></div>
+    <div class="hint" style="margin:12px 0 6px">Velocidade dos cortes</div>
+    <div class="row" id="rhythms"></div>
+  </div>
+
+  <button class="go" id="go" disabled>Criar edit</button>
+  <div class="status" id="status"></div>
+
+  <div class="card" id="result">
+    <h2>Seu edit ficou pronto 🔥</h2>
+    <video id="player" controls playsinline></video>
+    <a class="dl" id="dl" href="#" download="JM-edit.mp4">Baixar o edit</a>
+    <div class="hint">Se o download não começar, segure o dedo no vídeo e escolha salvar.</div>
+  </div>
+</div>
+
+<script>
+const COLORS = [
+  {n:"Santos", c:"#ffffff"}, {n:"Barcelona", c:"#a855f7"}, {n:"Brasil", c:"#ffd400"},
+  {n:"Flamengo", c:"#e11d2e"}, {n:"Real Madrid", c:"#e8e8ff"}, {n:"Corinthians", c:"#d9d9d9"},
+  {n:"Palmeiras", c:"#1fae4b"}, {n:"Argentina", c:"#6ec6ff"}
+];
+const DURATIONS = [[15,"15s"],[30,"30s"],[45,"45s"],[60,"60s"]];
+const RHYTHMS = [[1,"Rápido"],[2,"Normal"],[4,"Lento"]];
+const CHUNK = 4 * 1024 * 1024;
+
+const $ = id => document.getElementById(id);
+let state = { color:"#a855f7", duration:30, rhythm:2, jobId:null, music:null, video:null, busy:false };
+
+function setAccent(c){
+  document.documentElement.style.setProperty("--accent", c);
+  const r=parseInt(c.slice(1,3),16), g=parseInt(c.slice(3,5),16), b=parseInt(c.slice(5,7),16);
+  const light = (r*299+g*587+b*114)/1000 > 170;
+  $("logo").style.color = light ? "#111" : "#fff";
+  $("go").style.color = light ? "#111" : "#fff";
+}
+function chips(el, items, key, fmt){
+  el.innerHTML = "";
+  items.forEach(it => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip";
+    b.innerHTML = fmt(it);
+    b.onclick = () => { state[key] = it.v ?? it[0]; if (key==="color") {setAccent(state.color); $("custom").value = state.color;} render(); };
+    b._v = it.v ?? it[0];
+    el.appendChild(b);
+  });
+}
+function render(){
+  document.querySelectorAll("#colors .chip").forEach(b => b.classList.toggle("on", b._v === state.color));
+  document.querySelectorAll("#durations .chip").forEach(b => b.classList.toggle("on", b._v === state.duration));
+  document.querySelectorAll("#rhythms .chip").forEach(b => b.classList.toggle("on", b._v === state.rhythm));
+  $("go").disabled = !(state.music && state.video) || state.busy;
+}
+chips($("colors"), COLORS.map(x => ({v:x.c, n:x.n})), "color", it => {
+  const c = COLORS.find(x => x.c === it.v);
+  return `<span class="dot" style="background:${c.c}"></span>${c.n}`;
+});
+chips($("durations"), DURATIONS, "duration", it => it[1]);
+chips($("rhythms"), RHYTHMS, "rhythm", it => it[1]);
+$("custom").oninput = e => { state.color = e.target.value; setAccent(state.color); render(); };
+setAccent(state.color); render();
+
+function pickFile(inputId, boxId, key){
+  $(inputId).onchange = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    state[key] = f;
+    $(boxId).classList.add("ok");
+    $(boxId).querySelector(".name").textContent = f.name + " (" + (f.size/1048576).toFixed(1) + " MB)";
+    render();
+  };
+}
+pickFile("music","pickMusic","music"); pickFile("video","pickVideo","video");
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function uploadFile(file, kind, bar){
+  bar.style.display = "block";
+  const fill = bar.firstElementChild;
+  const total = Math.ceil(file.size / CHUNK);
+  for (let i = 0; i < total; i++){
+    const part = file.slice(i*CHUNK, (i+1)*CHUNK);
+    let ok = false;
+    for (let attempt = 0; attempt < 6 && !ok; attempt++){
+      try {
+        const fd = new FormData();
+        fd.append("i", i); fd.append("file", part, "parte");
+        const r = await fetch(`/api/upload/${state.jobId}/${kind}`, {method:"POST", body:fd});
+        if (r.ok) ok = true; else if (r.status !== 409) await sleep(1000*(attempt+1)); else throw new Error("ordem");
+      } catch (e) { await sleep(1000*(attempt+1)); }
+    }
+    if (!ok) throw new Error("A internet falhou durante o envio. Tente de novo.");
+    fill.style.width = Math.round(((i+1)/total)*100) + "%";
+    $("status").textContent = `Enviando ${kind==="music"?"a música":"o vídeo"}… ${Math.round(((i+1)/total)*100)}%`;
+  }
+}
+
+function fail(msg){
+  state.busy = false; render();
+  $("status").innerHTML = `<span class="err">${msg}</span>`;
+}
+
+$("go").onclick = async () => {
+  state.busy = true; render();
+  $("result").style.display = "none";
+  $("status").textContent = "Preparando…";
+  try {
+    const r = await fetch("/api/new", {method:"POST"});
+    state.jobId = (await r.json()).id;
+    await uploadFile(state.music, "music", $("barMusic"));
+    await uploadFile(state.video, "video", $("barVideo"));
+    const s = await fetch(`/api/start/${state.jobId}`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({color:state.color, duration:state.duration, rhythm:state.rhythm})
+    });
+    if (!s.ok) throw new Error((await s.json()).error || "Não consegui começar.");
+    poll();
+  } catch (e) { fail(e.message || "Algo deu errado."); }
+};
+
+async function poll(){
+  try {
+    const r = await fetch(`/api/status/${state.jobId}`);
+    const j = await r.json();
+    if (j.state === "done"){
+      state.busy = false; render();
+      const url = `/api/download/${state.jobId}`;
+      $("player").src = url + "?inline=1";
+      $("dl").href = url;
+      $("result").style.display = "block";
+      $("status").textContent = `Pronto! ${j.result.cuts} cortes, ${j.result.bpm} BPM.`;
+      $("result").scrollIntoView({behavior:"smooth"});
+      return;
+    }
+    if (j.state === "error") return fail(j.error || "Deu erro.");
+    $("status").textContent = `${j.stage} ${Math.round(j.progress*100)}%`;
+  } catch (e) { /* sem internet por um instante: tenta de novo */ }
+  setTimeout(poll, 2000);
+}
+</script>
+</body>
+</html>
